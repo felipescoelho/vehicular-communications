@@ -1,0 +1,95 @@
+% Exercise 2:
+%
+%
+% In automotive communications, the carrier frequency range lies between 76
+% and 81 GHz. Assume a bandwidth of BW = 500 MHz, a carrier of f_c = 80
+% GHz, a pulse duration of T = 40 \mus, and a range of detection d = 300 m.
+% Assume the target is moving at v = 300 km/h. Consider that we need to
+% cover a range swath of 20 m, so that you can choose L.
+% 
+% In this case, the Doppler effect originates a frequency shift of f_D =
+% f_c*(2*v/c) = 44444.44 Hz.
+% 
+% Use a pulse burst FMCW with one and four pulses and estimate the range
+% and the Doppler shift in both cases. Use a DFT in the fast-time axis to
+% estimate the range, and then calculate the Doppler shift from the data
+% delay for M = 1 and by exploring the slow-time information for M = 4.
+%
+% You can automatically detect a single target's delay by comparing the
+% outcome of the matched filter with some prescribed threshold. Compare the
+% results with those you know precisely the reflection delay, with the
+% estimated delay, and with the exact delay +/- 5% of its nominal value.
+%
+% delta_d = c/2BW
+
+clc
+clear
+close all
+
+% Definitions
+T = 40*1e-6;  % Pulse duration
+dc = .25;  % Duty-cycle
+T_ch = dc*T;  % Chirp duration
+BW = 500*1e6;  % Signal bandwidth
+f_c = 80*1e9;  % Carrier frequency
+v = 300;  % Target speed, km/h
+d = 300;
+c = 299792458;  % Speed of light, m/s
+d_w = 20;  % Range swath
+delta_d = c/(2*BW);  % Range resolution
+L = floor(d_w/delta_d); % Total number of samples in fast-time
+kmh2ms = @(x) 1000*x/(60*60);  % Function to convert km/h to m/s
+f_D = ((2*kmh2ms(v))/c) * f_c;  % Doppler effect
+nu = f_D/f_c;  % Doppler ratio
+f_c2 = 0;  % Reduce computational burden.
+a = BW/T;  % Chirp rate
+Fs = L/T_ch;  % Sampling rate
+M = 4;  % Number of pulses
+n0 = 3;  % Arbitrary n0
+
+
+% Time axis
+t_ch = linspace(0, T_ch, T_ch*Fs);
+t = linspace(0, T, T*Fs);
+
+% Transmitted signal (reference signal for xcorr)
+tx = exp(1j*pi*(f_c2).*t_ch).*exp(1j*pi*a.*t_ch.^2);
+tx = [tx zeros(1, (T-T_ch)*Fs)];
+
+% Received signal
+rx = exp(1j*pi*(f_c2+f_D).*t_ch).*exp(1j*pi*a*(1+nu).*t_ch.^2);
+
+% Memory allocation
+A = zeros(2*L + 1, M);
+N = L+n0;
+for m = 1:M
+    d_m = d + (m-1)*v*T;
+    t_samp_m = round(2*(d_m/c)*Fs);
+    rx_m = [zeros(1, t_samp_m) rx zeros(1, round((T-T_ch)*Fs) - t_samp_m)];
+    A(:, m) = xcorr(rx_m(1, n0+1:N), tx(1, n0+1:N), L, 'normalized');
+end
+A = A(L+2:end, :);
+LL = linspace(T_ch*Fs, L*T_ch*Fs, L);
+
+figure,
+surf(1:M, LL, abs(A))
+xlabel('Slow-time, $M$', 'interpreter', 'latex')
+ylabel('Fast-time, $L$', 'interpreter', 'latex')
+zlabel('Dechirped signal', 'interpreter', 'latex')
+
+
+fft_size = 2^ceil(log2(L) + 5);
+AA = fftshift(fft(A(:, 1), fft_size));
+freq = linspace(-.5, .5, fft_size)*(Fs/L);
+
+figure,
+plot(freq, abs(AA)), grid on
+
+[val, idx] = max(abs(A(:, 1)));
+display((LL(idx)/Fs)*c/2)
+
+
+
+
+
+% EoF
