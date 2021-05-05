@@ -28,25 +28,25 @@ close all
 
 % Definitions
 T = 40*1e-6;  % Pulse duration
-dc = .25;  % Duty-cycle
+dc = .7;  % Duty-cycle
 T_ch = dc*T;  % Chirp duration
 BW = 500*1e6;  % Signal bandwidth
 f_c = 80*1e9;  % Carrier frequency
 v = 300;  % Target speed, km/h
-d = 300;
+d = 300;  % Distance in meters
 c = 299792458;  % Speed of light, m/s
 d_w = 20;  % Range swath
 delta_d = c/(2*BW);  % Range resolution
-L = floor(d_w/delta_d); % Total number of samples in fast-time
+L = round(d_w/delta_d); % Total number of samples in fast-time
 kmh2ms = @(x) 1000*x/(60*60);  % Function to convert km/h to m/s
 f_D = ((2*kmh2ms(v))/c) * f_c;  % Doppler effect
 nu = f_D/f_c;  % Doppler ratio
 f_c2 = 0;  % Reduce computational burden.
 a = BW/T;  % Chirp rate
-Fs = L/T_ch;  % Sampling rate
+Fs = 2*BW;  % Sampling rate
 M = 4;  % Number of pulses
-n0 = 3;  % Arbitrary n0
-
+d_est = 300;  % Arbitrary distance
+n0 = round((2*d_est*Fs)/c);
 
 % Time axis
 t_ch = linspace(0, T_ch, T_ch*Fs);
@@ -54,7 +54,7 @@ t = linspace(0, T, T*Fs);
 
 % Transmitted signal (reference signal for xcorr)
 tx = exp(1j*pi*(f_c2).*t_ch).*exp(1j*pi*a.*t_ch.^2);
-tx = [tx zeros(1, (T-T_ch)*Fs)];
+tx = [tx zeros(1, round((T-T_ch)*Fs))];
 
 % Received signal
 rx = exp(1j*pi*(f_c2+f_D).*t_ch).*exp(1j*pi*a*(1+nu).*t_ch.^2);
@@ -63,31 +63,42 @@ rx = exp(1j*pi*(f_c2+f_D).*t_ch).*exp(1j*pi*a*(1+nu).*t_ch.^2);
 A = zeros(2*L + 1, M);
 N = L+n0;
 for m = 1:M
-    d_m = d + (m-1)*v*T;
+    d_m = d + (m-1)*kmh2ms(v)*T;
     t_samp_m = round(2*(d_m/c)*Fs);
     rx_m = [zeros(1, t_samp_m) rx zeros(1, round((T-T_ch)*Fs) - t_samp_m)];
     A(:, m) = xcorr(rx_m(1, n0+1:N), tx(1, n0+1:N), L, 'normalized');
 end
 A = A(L+2:end, :);
-LL = linspace(T_ch*Fs, L*T_ch*Fs, L);
+LL = linspace(0, L-1, L);
+MM = linspace(0, M-1, M);
 
 figure,
-surf(1:M, LL, abs(A))
+surf(MM, LL, abs(A))
 xlabel('Slow-time, $M$', 'interpreter', 'latex')
 ylabel('Fast-time, $L$', 'interpreter', 'latex')
 zlabel('Dechirped signal', 'interpreter', 'latex')
 
 
-fft_size = 2^ceil(log2(L) + 5);
-AA = fftshift(fft(A(:, 1), fft_size));
-freq = linspace(-.5, .5, fft_size)*(Fs/L);
+fft_size = 2^10;
+AA = fftshift(fft(abs(A(:, 1)), fft_size));
+freq = fftshift([linspace(0, fft_size/2-1, fft_size/2)...
+                 linspace(-fft_size/2, -1, fft_size/2)])*(Fs/fft_size);
 
 figure,
 plot(freq, abs(AA)), grid on
+xlabel('Frequency, $f$ [Hz]', 'interpreter', 'latex')
+ylabel('Magnitude', 'interpreter', 'latex')
+
+for idx = fft_size/2+2:fft_size
+    if (abs(AA(idx-1)) < abs(AA(idx)))&&(abs(AA(idx)) > abs(AA(idx+1)))
+        break
+    end
+end
+fd_hat = freq(idx);
 
 [val, idx] = max(abs(A(:, 1)));
-display((LL(idx)/Fs)*c/2)
-
+d_hat = ((LL(idx)+n0)/Fs)*c/2;
+fprintf('Estimated distance: %.4f meters.\n', d_hat)
 
 
 
