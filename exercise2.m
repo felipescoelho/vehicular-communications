@@ -1,6 +1,5 @@
 % Exercise 2:
 %
-%
 % In automotive communications, the carrier frequency range lies between 76
 % and 81 GHz. Assume a bandwidth of BW = 500 MHz, a carrier of f_c = 80
 % GHz, a pulse duration of T = 40 \mus, and a range of detection d = 300 m.
@@ -28,7 +27,7 @@ close all
 
 % Definitions
 T = 40*1e-6;  % Pulse duration
-dc = .7;  % Duty-cycle
+dc = 1;  % Duty-cycle
 T_ch = dc*T;  % Chirp duration
 BW = 500*1e6;  % Signal bandwidth
 f_c = 80*1e9;  % Carrier frequency
@@ -39,11 +38,11 @@ d_w = 20;  % Range swath
 delta_d = c/(2*BW);  % Range resolution
 L = round(d_w/delta_d); % Total number of samples in fast-time
 kmh2ms = @(x) 1000*x/(60*60);  % Function to convert km/h to m/s
-f_D = ((2*kmh2ms(v))/c) * f_c;  % Doppler effect
+f_D = ((2*kmh2ms(v))/(c-kmh2ms(v))) * f_c;  % Doppler effect
 nu = f_D/f_c;  % Doppler ratio
 f_c2 = 0;  % Reduce computational burden.
-a = BW/T;  % Chirp rate
-Fs = 2*BW;  % Sampling rate
+a = BW/T_ch;  % Chirp rate
+Fs = 9*1e10;  % Sampling rate
 M = 4;  % Number of pulses
 d_est = 300;  % Arbitrary distance
 n0 = round((2*d_est*Fs)/c);
@@ -78,8 +77,8 @@ xlabel('Slow-time, $M$', 'interpreter', 'latex')
 ylabel('Fast-time, $L$', 'interpreter', 'latex')
 zlabel('Dechirped signal', 'interpreter', 'latex')
 
-
-fft_size = 2^10;
+% M =1
+fft_size = 2^15;
 AA = fftshift(fft(abs(A(:, 1)), fft_size));
 freq = fftshift([linspace(0, fft_size/2-1, fft_size/2)...
                  linspace(-fft_size/2, -1, fft_size/2)])*(Fs/fft_size);
@@ -88,6 +87,40 @@ figure,
 plot(freq, abs(AA)), grid on
 xlabel('Frequency, $f$ [Hz]', 'interpreter', 'latex')
 ylabel('Magnitude', 'interpreter', 'latex')
+title('M=1', 'interpreter', 'latex')
+
+%M=2
+AA = fftshift(fft(abs(A(:, 2)), fft_size));
+freq = fftshift([linspace(0, fft_size/2-1, fft_size/2)...
+                 linspace(-fft_size/2, -1, fft_size/2)])*(Fs/fft_size);
+
+figure,
+plot(freq, abs(AA)), grid on
+xlabel('Frequency, $f$ [Hz]', 'interpreter', 'latex')
+ylabel('Magnitude', 'interpreter', 'latex')
+title('M=2', 'interpreter', 'latex')
+
+%M=3
+AA = fftshift(fft(abs(A(:, 3)), fft_size));
+freq = fftshift([linspace(0, fft_size/2-1, fft_size/2)...
+                 linspace(-fft_size/2, -1, fft_size/2)])*(Fs/fft_size);
+
+figure,
+plot(freq, abs(AA)), grid on
+xlabel('Frequency, $f$ [Hz]', 'interpreter', 'latex')
+ylabel('Magnitude', 'interpreter', 'latex')
+title('M=3', 'interpreter', 'latex')
+
+%M=4
+AA = fftshift(fft(abs(A(:, 4)), fft_size));
+freq = fftshift([linspace(0, fft_size/2-1, fft_size/2)...
+                 linspace(-fft_size/2, -1, fft_size/2)])*(Fs/fft_size);
+
+figure,
+plot(freq, abs(AA)), grid on
+xlabel('Frequency, $f$ [Hz]', 'interpreter', 'latex')
+ylabel('Magnitude', 'interpreter', 'latex')
+title('M=4', 'interpreter', 'latex')
 
 for idx = fft_size/2+2:fft_size
     if (abs(AA(idx-1)) < abs(AA(idx)))&&(abs(AA(idx)) > abs(AA(idx+1)))
@@ -98,9 +131,19 @@ fd_hat = freq(idx);
 
 [val, idx] = max(abs(A(:, 1)));
 d_hat = ((LL(idx)+n0)/Fs)*c/2;
-fprintf('Estimated distance: %.4f meters.\n', d_hat)
-
-
+fprintf('Estimated distance 1: %.4f meters.\n', d_hat)
+%M2
+[val, idx] = max(abs(A(:, 2)));
+d_hat = ((LL(idx)+n0)/Fs)*c/2;
+fprintf('Estimated distance 2: %.4f meters.\n', d_hat)
+%M3
+[val, idx] = max(abs(A(:, 3)));
+d_hat = ((LL(idx)+n0)/Fs)*c/2;
+fprintf('Estimated distance 3: %.4f meters.\n', d_hat)
+%M4
+[val, idx] = max(abs(A(:, 4)));
+d_hat = ((LL(idx)+n0)/Fs)*c/2;
+fprintf('Estimated distance 4: %.4f meters.\n', d_hat)
 
 
 % EoF
