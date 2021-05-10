@@ -19,15 +19,20 @@
 % results with those you know precisely the reflection delay, with the
 % estimated delay, and with the exact delay +/- 5% of its nominal value.
 %
-% delta_d = c/2BW
+%
+% Luiz Felipe da S. Coelho - luizfelipe.coelho@smt.ufrj.br
+% may 2021
+%
 
 clc
 clear
 close all
 
-% Definitions
+% -------------------------------------------------------------------------
+%                               Definitions
+% -------------------------------------------------------------------------
 T = 40*1e-6;  % Pulse duration
-dc = 1;  % Duty-cycle
+dc = .2;  % Duty-cycle
 T_ch = dc*T;  % Chirp duration
 BW = 500*1e6;  % Signal bandwidth
 f_c = 80*1e9;  % Carrier frequency
@@ -41,15 +46,28 @@ kmh2ms = @(x) 1000*x/(60*60);  % Function to convert km/h to m/s
 f_D = ((2*kmh2ms(v))/(c-kmh2ms(v))) * f_c;  % Doppler effect
 nu = f_D/f_c;  % Doppler ratio
 f_c2 = 0;  % Reduce computational burden.
-a = BW/T_ch;  % Chirp rate
-Fs = 9*1e10;  % Sampling rate
-M = 4;  % Number of pulses
-d_est = 300;  % Arbitrary distance
+a = BW/T;  % Chirp rate
+%
+% Sampling rate estimation:
+% To be able to detect a velocity of 300 km/h, one must have a minimal
+% sampling rate. The sampling period is given by the following equation.
+% Ts = v*(360/1000)*T*(1/c).
+% To alleviate the high sampling rate, one can multiply the this time by M
+% and use the 1st and the M-th pulse to estimate the velocity.
+%
+Ts = kmh2ms(abs(v))*T*(1/c);
+Fs = 1/Ts;  % Sampling rate
+M = 5;  % Number of pulses
+d_est = 299.96;  % Arbitrary distance (what distance I wanna see)
 n0 = round((2*d_est*Fs)/c);
+fft_size = 2^18;
 
+
+% -------------------------------------------------------------------------
+%                    Signal generation and processing
+% -------------------------------------------------------------------------
 % Time axis
 t_ch = linspace(0, T_ch, T_ch*Fs);
-t = linspace(0, T, T*Fs);
 
 % Transmitted signal (reference signal for xcorr)
 tx = exp(1j*pi*(f_c2).*t_ch).*exp(1j*pi*a.*t_ch.^2);
@@ -65,85 +83,119 @@ for m = 1:M
     d_m = d + (m-1)*kmh2ms(v)*T;
     t_samp_m = round(2*(d_m/c)*Fs);
     rx_m = [zeros(1, t_samp_m) rx zeros(1, round((T-T_ch)*Fs) - t_samp_m)];
+    % Dechirping process
     A(:, m) = xcorr(rx_m(1, n0+1:N), tx(1, n0+1:N), L, 'normalized');
 end
+
+% -------------------------------------------------------------------------
+%                   Slow-time vs. Fast-time matrix
+% -------------------------------------------------------------------------
 A = A(L+2:end, :);
 LL = linspace(0, L-1, L);
 MM = linspace(0, M-1, M);
 
 figure,
 surf(MM, LL, abs(A))
-xlabel('Slow-time, $M$', 'interpreter', 'latex')
-ylabel('Fast-time, $L$', 'interpreter', 'latex')
-zlabel('Dechirped signal', 'interpreter', 'latex')
+xlabel('Slow-time, $m$', 'interpreter', 'latex')
+ylabel('Fast-time, $l$', 'interpreter', 'latex')
+zlabel('Normalized dechirped signal', 'interpreter', 'latex')
+title('Slow-time vs. Fast-time matrix', 'interpreter', 'latex')
 
-% M =1
-fft_size = 2^15;
-AA = fftshift(fft(abs(A(:, 1)), fft_size));
+
+% -------------------------------------------------------------------------
+%                           Fast-time DFT
+% -------------------------------------------------------------------------
+fprintf('Distance estimation, (DFT):\n')
+% M = 0
+AA = fftshift(fft(A(:, 1), fft_size));
 freq = fftshift([linspace(0, fft_size/2-1, fft_size/2)...
                  linspace(-fft_size/2, -1, fft_size/2)])*(Fs/fft_size);
 
-figure,
-plot(freq, abs(AA)), grid on
-xlabel('Frequency, $f$ [Hz]', 'interpreter', 'latex')
-ylabel('Magnitude', 'interpreter', 'latex')
-title('M=1', 'interpreter', 'latex')
+[~, f_idx] = max(abs(AA));
+f_t = freq(f_idx);
+d_fft = (f_t*c)/(2*a);
+fprintf('Estimeated range, for m = 0: %.4f m.\n', d_fft)
 
-%M=2
-AA = fftshift(fft(abs(A(:, 2)), fft_size));
+% M = 1
+AA = fftshift(fft(A(:, 2), fft_size));
 freq = fftshift([linspace(0, fft_size/2-1, fft_size/2)...
                  linspace(-fft_size/2, -1, fft_size/2)])*(Fs/fft_size);
 
-figure,
-plot(freq, abs(AA)), grid on
-xlabel('Frequency, $f$ [Hz]', 'interpreter', 'latex')
-ylabel('Magnitude', 'interpreter', 'latex')
-title('M=2', 'interpreter', 'latex')
+[~, f_idx] = max(abs(AA));
+f_t = freq(f_idx);
+d_fft = (f_t*c)/(2*a);
+fprintf('Estimeated range, for m = 1: %.4f m.\n', d_fft)
 
-%M=3
-AA = fftshift(fft(abs(A(:, 3)), fft_size));
+% M = 2
+AA = fftshift(fft(A(:, 3), fft_size));
 freq = fftshift([linspace(0, fft_size/2-1, fft_size/2)...
                  linspace(-fft_size/2, -1, fft_size/2)])*(Fs/fft_size);
 
-figure,
-plot(freq, abs(AA)), grid on
-xlabel('Frequency, $f$ [Hz]', 'interpreter', 'latex')
-ylabel('Magnitude', 'interpreter', 'latex')
-title('M=3', 'interpreter', 'latex')
+[~, f_idx] = max(abs(AA));
+f_t = freq(f_idx);
+d_fft = (f_t*c)/(2*a);
+fprintf('Estimeated range, for m = 2: %.4f m.\n', d_fft)
 
-%M=4
-AA = fftshift(fft(abs(A(:, 4)), fft_size));
+% M = 3
+AA = fftshift(fft(A(:, 4), fft_size));
 freq = fftshift([linspace(0, fft_size/2-1, fft_size/2)...
                  linspace(-fft_size/2, -1, fft_size/2)])*(Fs/fft_size);
 
+[val, f_idx] = max(abs(AA));
+f_t = freq(f_idx);
+d_fft = (f_t*c)/(2*a);
+fprintf('Estimeated range, for m = 3: %.4f m.\n', d_fft)
+fprintf('\n')
+
 figure,
-plot(freq, abs(AA)), grid on
+plot(freq, abs(AA), 'linewidth', 2), hold on
+plot(freq(f_idx), val, 'x', 'markersize', 12, 'linewidth', 2), hold off, grid on
 xlabel('Frequency, $f$ [Hz]', 'interpreter', 'latex')
 ylabel('Magnitude', 'interpreter', 'latex')
-title('M=4', 'interpreter', 'latex')
+title('Fast-time spectrum for $m=3$', 'interpreter', 'latex')
+legend('Fast-time DFT', 'Maximum Value')
+xlim([-2 2]*1e9)
 
-for idx = fft_size/2+2:fft_size
-    if (abs(AA(idx-1)) < abs(AA(idx)))&&(abs(AA(idx)) > abs(AA(idx+1)))
-        break
-    end
-end
-fd_hat = freq(idx);
-
-[val, idx] = max(abs(A(:, 1)));
-d_hat = ((LL(idx)+n0)/Fs)*c/2;
-fprintf('Estimated distance 1: %.4f meters.\n', d_hat)
-%M2
-[val, idx] = max(abs(A(:, 2)));
-d_hat = ((LL(idx)+n0)/Fs)*c/2;
-fprintf('Estimated distance 2: %.4f meters.\n', d_hat)
-%M3
-[val, idx] = max(abs(A(:, 3)));
-d_hat = ((LL(idx)+n0)/Fs)*c/2;
-fprintf('Estimated distance 3: %.4f meters.\n', d_hat)
-%M4
+% -------------------------------------------------------------------------
+%                           Distance Estiamation
+% -------------------------------------------------------------------------
+fprintf('Distance estimation (maximum value in matrix):\n')
+% m = 0
+[~, idx] = max(abs(A(:, 1)));
+d_hat1 = ((LL(idx)+n0)/Fs)*c/2;
+fprintf('Estimated distance m = 0: %.4f m.\n', d_hat1)
+% m = 1
+[~, idx] = max(abs(A(:, 2)));
+d_hat2 = ((LL(idx)+n0)/Fs)*c/2;
+fprintf('Estimated distance m = 1: %.4f m.\n', d_hat2)
+% m = 2
+[~, idx] = max(abs(A(:, 3)));
+d_hat3 = ((LL(idx)+n0)/Fs)*c/2;
+fprintf('Estimated distance m = 2: %.4f m.\n', d_hat3)
+% m = 3
 [val, idx] = max(abs(A(:, 4)));
-d_hat = ((LL(idx)+n0)/Fs)*c/2;
-fprintf('Estimated distance 4: %.4f meters.\n', d_hat)
+d_hat4 = ((LL(idx)+n0)/Fs)*c/2;
+fprintf('Estimated distance m = 3: %.4f m.\n', d_hat4)
+fprintf('\n')
 
 
+% -------------------------------------------------------------------------
+%                           Velocity Estimation
+% -------------------------------------------------------------------------
+fprintf('Velocity estimation:\n')
+vel = (d_hat2-d_hat1)/(T);
+ms2kmh = @(x) (60*60)*x/1000;  % Function to convert m/s to km/h
+fprintf('Estimated velocity, using m = 0 and m = 1: %.2f km/h.\n',...
+        ms2kmh(vel))
+
+vel = (d_hat3-d_hat1)/(2*T);
+ms2kmh = @(x) (60*60)*x/1000;  % Function to convert m/s to km/h
+fprintf('Estimated velocity, using M = 0 and M = 2: %.2f km/h.\n',...
+        ms2kmh(vel))
+
+vel = (d_hat4-d_hat1)/(3*T);
+ms2kmh = @(x) (60*60)*x/1000;  % Function to convert m/s to km/h
+fprintf('Estimated velocity, using M = 0 and M = 3: %.2f km/h.\n',...
+        ms2kmh(vel))
+    
 % EoF
