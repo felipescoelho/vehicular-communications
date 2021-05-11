@@ -33,9 +33,10 @@ snr = 30000;
 rx_ch = exp(1j*pi*(0+f_D_targ).*t_ch).*exp(1j*(pi*a*(1+nu_targ).*t_ch.^2));
 rx = [zeros(1, t_samp) rx_ch zeros(1, round((T-T_ch)*Fs) - t_samp)];
 
-fft_size = 2^ceil(log2(length(rx)));
+fft_size = 2048;
 RX = fftshift(fft(rx, fft_size))/(fft_size);
-freq = linspace(-.5, .5, fft_size)/Fs;
+freq = fftshift([linspace(0, fft_size/2-1, fft_size/2)...
+                 linspace(-fft_size/2, -1, fft_size/2)])*(Fs/fft_size);
 
 tic;
 parfor idx = 1:V
@@ -60,7 +61,7 @@ fprintf('---------------------------------------\n')
 fprintf('Estimated velocity: %.4f km/h.\n', (v_hat/360)*1e3)
 fprintf('Estimated distance: %.4f m.\n', d_hat)
 
-% Plot
+% Plotting
 lags = linspace(-1, 1, 2*maxlag+1);
 fd_norm = linspace(-10, 10, V);
 [XX, YY] = meshgrid(fd_norm, lags);
@@ -78,4 +79,8 @@ plot(freq, abs(RX), 'linewidth', 2), grid on
 xlabel('Frequency, $f$ [Hz]', 'interpreter', 'latex')
 ylabel('Magnitude, $|X(f)|$', 'interpreter', 'latex')
 title('Spectrum of the Radar Signal', 'interpreter', 'latex')
-xlim([-1.0*10^(-6) 1.0*10^(-6)])
+xlim([-2e4, 2e4])
+
+
+% EoF
+

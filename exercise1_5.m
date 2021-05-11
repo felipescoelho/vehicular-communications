@@ -32,9 +32,10 @@ snr = -15;  % Signal to noise ratio, dB
 rx_ch = exp(1j*pi*(0+f_D_targ).*t_ch).*exp(1j*(pi*a*(1+nu_targ).*t_ch.^2));
 rx = [zeros(1, t_samp) rx_ch zeros(1, round((T-T_ch)*Fs) - t_samp)];
 
-fft_size = 2^ceil(log2(length(rx)));
+fft_size = 2^14;
 RX = fftshift(fft(rx, fft_size))/(fft_size);
-freq = linspace(-.5, .5, fft_size)*(Fs/fft_size);
+freq = fftshift([linspace(0, fft_size/2-1, fft_size/2)...
+                 linspace(-fft_size/2, -1, fft_size/2)])*(Fs/fft_size);
 
 tic;
 parfor idx = 1:V
@@ -133,7 +134,9 @@ title('Ambiguity Function for $M=10$', 'interpreter', 'latex')
 figure(4),
 plot(freq, abs(RX), 'linewidth', 2), grid on
 xlabel('Frequency, $f$ [Hz]', 'interpreter', 'latex')
-%ylabel('Magnitude, $|RX(f)|$', 'interpreter', 'latex')
 ylabel('Magnitude, $|X(f)|$', 'interpreter', 'latex')
 title('Spectrum of the Radar Signal', 'interpreter', 'latex')
-xlim([-10 10])
+xlim([-2e4 2e4])
+
+
+% EoF
