@@ -57,10 +57,10 @@ a = BW/T;  % Chirp rate
 %
 Ts = kmh2ms(abs(v))*T*(1/c);
 Fs = 1/Ts;  % Sampling rate
-M = 5;  % Number of pulses
-d_est = 299.96;  % Arbitrary distance (what distance I wanna see)
-n0 = round((2*d_est*Fs)/c);
-fft_size = 2^18;
+M = 4;  % Number of pulses
+tau = 2*d/c;  % How much time to m=0 peak
+n0 = round(tau*Fs - L/2);  % I want m=0 peak to be centered
+fft_size = 2^18;  % High FFT size is a problem in range estimation
 
 
 % -------------------------------------------------------------------------
@@ -100,7 +100,7 @@ xlabel('Slow-time, $m$', 'interpreter', 'latex')
 ylabel('Fast-time, $l$', 'interpreter', 'latex')
 zlabel('Normalized dechirped signal', 'interpreter', 'latex')
 title('Slow-time vs. Fast-time matrix', 'interpreter', 'latex')
-
+xticks([0 1 2 3])
 
 % -------------------------------------------------------------------------
 %                           Fast-time DFT
@@ -114,7 +114,7 @@ freq = fftshift([linspace(0, fft_size/2-1, fft_size/2)...
 [~, f_idx] = max(abs(AA));
 f_t = freq(f_idx);
 d_fft = (f_t*c)/(2*a);
-fprintf('Estimeated range, for m = 0: %.4f m.\n', d_fft)
+fprintf('Estimated range, for m = 0: %.4f m.\n', d_fft)
 
 % M = 1
 AA = fftshift(fft(A(:, 2), fft_size));
@@ -124,7 +124,7 @@ freq = fftshift([linspace(0, fft_size/2-1, fft_size/2)...
 [~, f_idx] = max(abs(AA));
 f_t = freq(f_idx);
 d_fft = (f_t*c)/(2*a);
-fprintf('Estimeated range, for m = 1: %.4f m.\n', d_fft)
+fprintf('Estimated range, for m = 1: %.4f m.\n', d_fft)
 
 % M = 2
 AA = fftshift(fft(A(:, 3), fft_size));
@@ -134,7 +134,7 @@ freq = fftshift([linspace(0, fft_size/2-1, fft_size/2)...
 [~, f_idx] = max(abs(AA));
 f_t = freq(f_idx);
 d_fft = (f_t*c)/(2*a);
-fprintf('Estimeated range, for m = 2: %.4f m.\n', d_fft)
+fprintf('Estimated range, for m = 2: %.4f m.\n', d_fft)
 
 % M = 3
 AA = fftshift(fft(A(:, 4), fft_size));
@@ -144,7 +144,7 @@ freq = fftshift([linspace(0, fft_size/2-1, fft_size/2)...
 [val, f_idx] = max(abs(AA));
 f_t = freq(f_idx);
 d_fft = (f_t*c)/(2*a);
-fprintf('Estimeated range, for m = 3: %.4f m.\n', d_fft)
+fprintf('Estimated range, for m = 3: %.4f m.\n', d_fft)
 fprintf('\n')
 
 figure,
@@ -157,7 +157,7 @@ legend('Fast-time DFT', 'Maximum Value')
 xlim([-2 2]*1e9)
 
 % -------------------------------------------------------------------------
-%                           Distance Estiamation
+%                           Distance Estimation
 % -------------------------------------------------------------------------
 fprintf('Distance estimation (maximum value in matrix):\n')
 % m = 0
@@ -189,13 +189,11 @@ fprintf('Estimated velocity, using m = 0 and m = 1: %.2f km/h.\n',...
         ms2kmh(vel))
 
 vel = (d_hat3-d_hat1)/(2*T);
-ms2kmh = @(x) (60*60)*x/1000;  % Function to convert m/s to km/h
-fprintf('Estimated velocity, using M = 0 and M = 2: %.2f km/h.\n',...
+fprintf('Estimated velocity, using m = 0 and m = 2: %.2f km/h.\n',...
         ms2kmh(vel))
 
 vel = (d_hat4-d_hat1)/(3*T);
-ms2kmh = @(x) (60*60)*x/1000;  % Function to convert m/s to km/h
-fprintf('Estimated velocity, using M = 0 and M = 3: %.2f km/h.\n',...
+fprintf('Estimated velocity, using m = 0 and m = 3: %.2f km/h.\n',...
         ms2kmh(vel))
     
 % EoF
