@@ -8,3 +8,5 @@ ___
 * `exercise1_3.m`
 * `exercise1_4.m`
 * `exercise1_5.m`
+___
+* `exercise2.m`
